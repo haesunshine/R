@@ -1,0 +1,116 @@
+# Clear the console
+cat("\014")
+# Remove every object in the environment
+rm(list = ls())
+
+# install and load necessary packages
+lib <- c("extrafont", "ggplot2", "dplyr", "RColorBrewer", "raster", "maps", "mapproj", "gridExtra")
+sapply(lib, function(x) require(x, character.only = TRUE))
+loadfonts (device = "win")
+
+# set working directory
+setwd("C:/Users/HSeok/Downloads")
+
+# import CA map by county
+usa <- getData('GADM', country="USA", level=2)
+ca.map <- usa[usa$NAME_1 == "California",] 
+ca.map@data$id <- rownames(ca.map@data)
+ca.df <- merge(ca.map@data, fortify(ca.map), by = "id", all.y = TRUE)
+ca.df <- ca.df[,c("NAME_2", "long", "lat", "group")]
+names(ca.df) <- c("county", "long", "lat", "group")
+ca.df$county <- tolower(ca.df$county)
+
+# import the state unemployment data
+cali <- read.csv("cali.csv", as.is = TRUE)
+cali$county <- tolower(cali$county)
+cali$labor_force <- as.numeric(gsub(",", "", cali$labor_force))
+cali$unemployment <- as.numeric(gsub(",", "", cali$unemployment))
+cali$rate <- cali$unemployment/cali$labor_force
+
+# merge
+ca.plot <- merge(ca.df, cali, by = "county")
+
+# import the trulia data
+cali <- read.csv("cali_home.csv", as.is = TRUE)
+cali <- cali[, c(1:2)]
+names(cali) <- c("county", "avg_list")
+cali$avg_list <- as.numeric(gsub("[,$]","", cali$avg_list))
+cali$county <- tolower(cali$county)
+
+# merge trulia data
+ca.home <- left_join(ca.df, cali, by = c("county"))
+
+#############################################
+# SNAPSHOT of 2014-Nov Unemployment Rate by County in CA
+#############################################
+
+# plot unemployment
+p1 <- ggplot() + 
+      geom_polygon(data = ca.plot, aes(x = long, y = lat, group = group, fill = rate)) +
+      scale_fill_gradientn(colours=brewer.pal(9,"Reds"), 
+                         labels = percent,
+                         name = "Unemployment Rate, Nov. 2014") +
+      theme_bw() +
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank(),
+            panel.border = element_blank()) +
+      theme(axis.title.x = element_blank(),
+            axis.title.y = element_blank(),
+            axis.text = element_blank(),
+            axis.ticks = element_blank()
+           ) +
+      theme(plot.title = element_text(size = 18, face = "bold")) +
+
+      theme(legend.position = "bottom",
+            legend.key.width = unit(1.5, "cm"),
+            legend.text = element_text(size = 7)) +
+      theme(text = element_text(family = "Arial")) 
+
+p1.b <- p1 +
+        borders("county", colour="white", alpha = 0.5, size = 0.5, region = "california")
+
+plot1 <- arrangeGrob(p1, sub = textGrob("\n\nSource: State of California, Employment Development Department;\n                Trulia (Data for Week Ending 1/14/2015)\n", x = 0, hjust = -0.1, vjust=0.1, gp = gpar(fontsize = 9)))
+plot1.b <- arrangeGrob(p1.b, sub = textGrob("\n\nSource: State of California, Employment Development Department;\n                Trulia (Data for Week Ending 1/14/2015)\n", x = 0, hjust = -0.1, vjust=0.1, gp = gpar(fontsize = 9)))
+
+# plot home prices
+
+p2 <- ggplot() + 
+      geom_polygon(data = ca.home, aes(x = long, y = lat, group = group, fill = avg_list)) +
+      scale_fill_gradientn(colours = brewer.pal(9,"Blues"), 
+                            labels = dollar,
+                              name = "Avg. Listing Price") +
+      theme_bw() +
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank(),
+            panel.border = element_blank()) +
+      theme(axis.title.x = element_blank(),
+            axis.title.y = element_blank(),
+            axis.text = element_blank(),
+            axis.ticks = element_blank()) +
+      theme(plot.title = element_text(size = 18, face = "bold")) +
+
+      theme(legend.position = "bottom",         
+            legend.key.width = unit(1.5, "cm"),
+            legend.text = element_text(size = 7)) +
+      theme(text = element_text(family = "Arial"))
+
+p2.b <- p2 + borders("county", colour="white", alpha = 0.5, size = 0.5, region = "california")
+
+plot2 <- arrangeGrob(p2, sub = textGrob(" \n\n\n\n", x = 0, hjust = -0.1, vjust=0.1, gp = gpar(fontsize = 9)))
+plot2.b <- arrangeGrob(p2.b, sub = textGrob(" \n\n\n\n", x = 0, hjust = -0.1, vjust=0.1, gp = gpar(fontsize = 9)))
+
+
+pdf("13. California Unemployment and Home Prices.pdf", onefile = TRUE, paper = "a4r", width = 13)
+pushViewport(viewport(layout = grid.layout(1, 2)))
+print(plot1, vp = viewport(layout.pos.row = 1, layout.pos.col = 1))
+print(plot2, vp = viewport(layout.pos.row = 1, layout.pos.col = 2))
+dev.off()
+
+pdf("13. California Unemployment and Home Prices - borders.pdf", onefile = TRUE, paper = "a4r", width = 13)
+pushViewport(viewport(layout = grid.layout(1, 2)))
+print(plot1.b, vp = viewport(layout.pos.row = 1, layout.pos.col = 1))
+print(plot2.b, vp = viewport(layout.pos.row = 1, layout.pos.col = 2))
+dev.off()
+
+
+
