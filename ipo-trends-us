@@ -1,0 +1,102 @@
+# clear the console
+cat("\014")
+
+# remove every object in environment
+rm(list = ls())
+
+# install and load necessary packages
+lib <- c("extrafont", "ggplot2", "dplyr", "grid", "gridExtra", "scales")
+sapply(lib, function(x) require(x, character.only = TRUE))
+loadfonts(device="win")
+
+setwd("C:/Users/hseok/Downloads")
+
+# import data
+data <- read.csv("ipo.csv", as.is = TRUE)
+data$year <- as.numeric(data$year)
+data$number_offerings <- as.numeric(data$number_offerings)
+data$ave_first_day_return <- as.numeric(gsub("%", "", data$ave_first_day_return))/100
+data$gross_proceeds_millions <- as.numeric(gsub(",", "", data$gross_proceeds_millions))
+data$year <- as.Date(paste0(data$year, "-01-01"))
+# recession years
+date.ranges <- data.frame(
+  from = as.Date(c("1960-04-01", "1973-11-01", "1980-01-01", "1981-07-01", "2001-03-01", "2007-12-01")), 
+  to = as.Date(c("1961-02-20", "1975-03-30", "1980-07-31", "1982-11-30", "2001-11-30", "2009-06-30"))
+)
+
+# draw individual plots
+
+# the upper panel
+data$year <- as.Date(data$year)
+
+p1 <- ggplot() + 
+  geom_line(data = data, aes(x = year, y = ave_first_day_return), group = 1, colour = "maroon", size = 1) + 
+  theme_bw() +
+  theme(
+    panel.grid.major = element_blank(), 
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank()) +
+  theme(axis.line = element_line(size = 0.5, colour = "black"),
+      # axis.ticks = element_blank(), 
+      # axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text = element_text(size = 10)) +
+  scale_y_continuous(labels = percent,
+                     limits = c(-.25, 0.75),
+                     breaks = seq(-.25, 0.75, 0.25),
+                     expand = c(0,0)) +
+  scale_x_date(labels = date_format("%Y"), 
+               expand = c(0,0), 
+               limits = c(as.Date("1960-01-01"), as.Date("2013-12-31")),
+               breaks = seq(as.Date("1960-01-01"), as.Date("2013-12-31"), length.out = 8)) +
+  theme(plot.title = element_text(size = 18, face = "bold")) +
+  ggtitle("Average First-Day Returns\n") +
+  theme(text = element_text(family = "Arial")) +
+  geom_rect(data = date.ranges, 
+            aes(xmin = from - 1, xmax = to, ymin = -Inf, ymax = Inf), 
+            alpha = 0.3) 
+
+
+# the lower panel
+p2 <- ggplot() + 
+      geom_line(data = data, aes(x = year, y = number_offerings), group = 1, colour = "navy", size = 1) +
+      theme_bw() +
+      theme(
+            panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank(),
+            panel.border = element_blank()) +
+      theme(axis.line = element_line(size = 0.5, colour = "black"),
+            axis.title.x = element_blank(), 
+            axis.title.y = element_blank(),
+            axis.text = element_text(size = 10)) +
+      scale_y_continuous(
+                         limits = c(0, 800),
+                         breaks = seq(0, 800, 100),
+                         expand = c(0,0)) +
+      scale_x_date(labels = date_format("%Y"), 
+                   expand = c(0,0), 
+                   limits = c(as.Date("1960-01-01"), as.Date("2013-12-31")),
+                   breaks = seq(as.Date("1960-01-01"), as.Date("2013-12-31"), length.out = 8)) +
+      theme(plot.title = element_text(size = 18, face = "bold")) +
+      ggtitle("Number of Initial Public Offerings\n") +
+      theme(text = element_text(family = "Arial")) +
+      geom_rect(data = date.ranges, 
+          aes(xmin = from - 1, xmax = to, ymin = -Inf, ymax = Inf), 
+          alpha = 0.3) 
+
+p2 <- arrangeGrob(p2, sub = textGrob("Source: Website of Jay R. Ritter, Professor of Finance at University of Florida\nNote: Major recessions in the United States are shaded in grey.\n", 
+                                              x = 0, hjust = 0, gp = gpar(fontsize = 9)))
+
+# Define grid layout to locate plots and print each graph
+
+pdf("10. IPOs in the US.pdf", onefile = TRUE, paper = "a4r")
+pushViewport(viewport(layout = grid.layout(2, 1)))
+print(p1, vp = viewport(layout.pos.row = 1, layout.pos.col = 1))
+print(p2, vp = viewport(layout.pos.row = 2, layout.pos.col = 1))
+dev.off() 
+
+
+
+      
+  
